@@ -1,0 +1,7 @@
+name: "archetype"
+version: "0.1.0"
+usage: "create a new chart from a templated starter scaffold"
+description: "create a new chart from a templated starter scaffold"
+command: "$HELM_PLUGIN_DIR/archetype"
+hooks:
+  install: "$HELM_PLUGIN_DIR/install-binary.sh"
