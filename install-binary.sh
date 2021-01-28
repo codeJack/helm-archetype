@@ -1,12 +1,17 @@
-
-#!/usr/bin/env bash
+#!/bin/bash
 
 # borrowed from https://github.com/technosophos/helm-template
 
 PROJECT_NAME="helm-archetype"
 PROJECT_GH="codeJack/$PROJECT_NAME"
 
-: ${HELM_PLUGIN_PATH:="$(helm home)/plugins/helm-unittest"}
+if helm version | grep -q v3; then
+  HELM_PATH="$(helm env | grep HELM_PLUGINS | awk -F '=' '{print $2}' | sed 's/\"//g')"
+else
+  HELM_PATH="$(helm home)"
+fi
+
+: "${HELM_PLUGIN_PATH:="$HELM_PATH/helm-archetype"}"
 
 # Convert the HELM_PLUGIN_PATH to unix if cygpath is
 # available. This is the case when using MSYS2 or Cygwin
@@ -58,7 +63,7 @@ verifySupported() {
     exit 1
   fi
 
-  if ! type "curl" >/dev/null 2>&1 && ! type "wget" >/dev/null 2>&1; then
+  if ! type curl >/dev/null 2>&1 && ! type wget >/dev/null 2>&1; then
     echo "Either curl or wget is required"
     exit 1
   fi
@@ -69,13 +74,14 @@ getDownloadURL() {
   # Use the GitHub API to find the latest version for this project.
   local latest_url="https://api.github.com/repos/$PROJECT_GH/releases/latest"
   local version=$(git describe --tags --exact-match 2>/dev/null)
+
   if [ -n "$version" ]; then
     url="https://api.github.com/repos/$PROJECT_GH/releases/tags/$version"
   fi
-  if type "curl" >/dev/null 2>&1; then
-    DOWNLOAD_URL=$(curl -s $latest_url | grep $OS | awk '/\"browser_download_url\":/{gsub( /[,\"]/,"", $2); print $2}')
-  elif type "wget" >/dev/null 2>&1; then
-    DOWNLOAD_URL=$(wget -q -O - $latest_url | awk '/\"browser_download_url\":/{gsub( /[,\"]/,"", $2); print $2}')
+  if type curl >/dev/null 2>&1; then
+    DOWNLOAD_URL=$(curl -s $latest_url | grep $OS | awk '/"browser_download_url":/{gsub( /[,\"]/,"", $2); print $2}')
+  elif type wget >/dev/null 2>&1; then
+    DOWNLOAD_URL=$(wget -q -O - $latest_url | grep $OS | awk '/"browser_download_url":/{gsub( /[,\"]/,"", $2); print $2}')
   fi
 }
 
@@ -84,10 +90,10 @@ getDownloadURL() {
 downloadFile() {
   PLUGIN_TMP_FILE="/tmp/${PROJECT_NAME}.tgz"
   echo "Downloading $DOWNLOAD_URL"
-  if type "curl" >/dev/null 2>&1; then
-    curl -L "$DOWNLOAD_URL" -o "$PLUGIN_TMP_FILE"
+  if type curl >/dev/null 2>&1; then
+    curl -kL "$DOWNLOAD_URL" -o "$PLUGIN_TMP_FILE"
   elif type "wget" >/dev/null 2>&1; then
-    wget -q -O "$PLUGIN_TMP_FILE" "$DOWNLOAD_URL"
+    wget --no-check-certificate -q -O "$PLUGIN_TMP_FILE" "$DOWNLOAD_URL"
   fi
 }
 
@@ -97,7 +103,7 @@ installFile() {
   HELM_TMP="/tmp/$PROJECT_NAME"
   mkdir -p "$HELM_TMP"
   tar xf "$PLUGIN_TMP_FILE" -C "$HELM_TMP"
-  HELM_TMP_BIN="$HELM_TMP/untt"
+  HELM_TMP_BIN="$HELM_TMP/helm-archetype"
   echo "Preparing to install into ${HELM_PLUGIN_PATH}"
   # Use * to also copy the file withe the exe suffix on Windows
   cp "$HELM_TMP_BIN"* "$HELM_PLUGIN_PATH"
@@ -116,10 +122,13 @@ fail_trap() {
 
 # testVersion tests the installed client to make sure it is working.
 testVersion() {
-  # To avoid to keep track of the Windows suffix,
-  # call the plugin assuming it is in the PATH
   PATH=$PATH:$HELM_PLUGIN_PATH
-  untt -h
+  
+  if [ "${OS}" != "windows" ]; then
+    helm-archetype -h
+  else
+    helm-archetype.exe -h
+  fi
 }
 
 # Execution
