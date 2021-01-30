@@ -1,8 +1,8 @@
 # Helm Archetype Plugin
 
-This plugin extends Helm's built-in *create from* capabilities by allowing **templated** starters. Such templated starters get rendered at *creation time* as if the `helm template` output was dumped into a new chart.
+This plugin extends Helm's built-in *create from* capabilities by allowing **templated** starters. Such templated starters get rendered at *creation time* as if their `helm template` output got dumped into a brand new chart.
 
-Such an approach aims at reducing the overall complexity of helm charts by shifting left part of the rendering logic and narrowing down their scope yet preserving the flexibility to reassess such a scope through repeated creation.  
+Such an approach aims at reducing the overall complexity of helm charts, by shifting left part of the rendering logic and narrowing down their scope, yet preserving the flexibility to later re-assess such a scope through repeated creation.  
 
 To distinguish between *creation time* templates and *install time* templates, *creation time* templates are to be delimited by double **round brackets** as opposed to double **curly brackets**
 
@@ -19,6 +19,8 @@ The *values* to be provided at `helm archetype` time are structured with two roo
 - `Chart` node will provide *Chart.yaml* metadata (apart from the chart name which is provided as a positional argument to the plug-in) 
 - `Values` node will provide the necessary values for the rendering exercise
 
+Additionally, as this plugin extends Helm's built-in *create from* capabilities, the `<CHARTNAME>` value can also be used within the starter, and, quoting [Helm documentation](https://helm.sh/docs/topics/charts/) *"All occurrences of `<CHARTNAME>` will be replaced with the specified chart name so that starter charts can be used as templates."*
+
 ```yaml
 Chart:
   description: "Helm archetype chart"
@@ -28,6 +30,8 @@ Chart:
 Values:
   version: "0.1.0"
 ```
+
+Template files which would result as empty (or blank) past the rendering exercise will be deleted, in order to guarantee the thinner possible chart structure.
 
 ## Usage
 
@@ -54,3 +58,5 @@ $ helm plugin install https://github.com/codeJack/helm-archetype
 ```
 
 The above will fetch the latest binary release of `helm archetype` and install it.
+
+In case the remote `helm plugin install` fails you can clone this repository and rely on `make install`.

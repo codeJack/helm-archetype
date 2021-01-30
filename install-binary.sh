@@ -91,9 +91,9 @@ downloadFile() {
   PLUGIN_TMP_FILE="/tmp/${PROJECT_NAME}.tgz"
   echo "Downloading $DOWNLOAD_URL"
   if type curl >/dev/null 2>&1; then
-    curl -kL "$DOWNLOAD_URL" -o "$PLUGIN_TMP_FILE"
+    curl -L "$DOWNLOAD_URL" -o "$PLUGIN_TMP_FILE"
   elif type "wget" >/dev/null 2>&1; then
-    wget --no-check-certificate -q -O "$PLUGIN_TMP_FILE" "$DOWNLOAD_URL"
+    wget -q -O "$PLUGIN_TMP_FILE" "$DOWNLOAD_URL"
   fi
 }
 

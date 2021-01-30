@@ -1,22 +1,18 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"text/template"
+  "os"
+  "path/filepath"
+  
+  "github.com/codeJack/helm-archetype/archetype"
+  "github.com/spf13/cobra"
 
-	"github.com/Masterminds/sprig"
-	"github.com/spf13/cobra"
-
-	"helm.sh/helm/v3/cmd/helm/require"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/helmpath"
+  "helm.sh/helm/v3/cmd/helm/require"
+  "helm.sh/helm/v3/pkg/chartutil"
+  "helm.sh/helm/v3/pkg/cli"
+  "helm.sh/helm/v3/pkg/cli/values"
+  "helm.sh/helm/v3/pkg/getter"
+  "helm.sh/helm/v3/pkg/helmpath"
 )
 
 type archetypeOptions struct {
@@ -61,112 +57,27 @@ func main() {
 
 func (o *archetypeOptions) run(valuesOpts *values.Options) error {
 
-  p := getter.All(cli.New())
-  vals, err := valuesOpts.MergeValues(p)
-  if err != nil {
-    return fmt.Errorf("Could not merge values")
-  }
-
-  chartname := filepath.Base(o.name)
-  cfile := chartMetadata(chartname, vals)
-
   // Create from the starter
   lstarter := filepath.Join(o.starterDir, o.starter)
   // If path is absolute, we don't want to prefix it with helm starters folder
   if filepath.IsAbs(o.starter) {
     lstarter = o.starter
   }
-  
+
+  p := getter.All(cli.New())
+  vals, err := valuesOpts.MergeValues(p)
+  if err != nil {
+    return err
+  }
+
+  archetype := archetype.New(o.name, &vals)
+  cfile := archetype.ChartMetadata()
   err = chartutil.CreateFrom(cfile, filepath.Dir(o.name), lstarter)
   if err != nil {
-    return fmt.Errorf("Could not create chart %s from starter %s\n", o.name, lstarter)
+    return err
   }
 
-  // Render values file
-  vfile := filepath.Join(o.name, "values.yaml")
-  if _, err := os.Stat(vfile); err == nil {
-    err = render(vfile, vals)  
-    if err != nil {
-      return err;
-    }
-  }
-
-  // Render templates
-  tdir := filepath.Join(o.name, "templates")
-  if _, err := os.Stat(tdir); err == nil {
-    files, err := ioutil.ReadDir(tdir)
-    if err != nil {
-      return fmt.Errorf("Could not read directory %s\n", tdir)
-    }  
-    for _, file := range files {
-      err = render(filepath.Join(o.name, "templates", file.Name()), vals)
-      if err != nil {
-        return err;
-      }
-    }
-  }
-  return nil
+  return archetype.Run()
 }
 
 
-// chartMetadata creates a new chart metadata with default values
-func chartMetadata(chartname string, vals map[string]interface{}) *chart.Metadata {
-
-  description := "A Helm chart for Kubernetes"
-  version := "0.1.0"
-  appVersion := "0.1.0"
-
-  if chartMetadata, ok := vals["Chart"]; ok {
-    chartMetadata := chartMetadata.(map[string]interface{})
-    if field, ok := chartMetadata["description"]; ok {
-      description = field.(string)
-    }
-    if field, ok := chartMetadata["version"]; ok {
-      version = field.(string)
-    }
-    if field, ok := chartMetadata["appVersion"]; ok {
-      appVersion = field.(string)
-    }
-  }
-
-  return &chart.Metadata{
-    Name:        chartname,
-    Description: description,
-    Type:        "application",
-    Version:     version,
-    AppVersion:  appVersion,
-    APIVersion:  chart.APIVersionV2,
-  }
-}
-
-func render(file string, vals map[string]interface{}) error {
-  fmt.Printf("Rendering file %s\n", file)
-  
-  tpl := template.New("gotpl").Funcs(sprig.TxtFuncMap())
-  tpl.Delims("((", "))")
-
-  contents, err := ioutil.ReadFile(file)
-  if err != nil {
-    return fmt.Errorf("Could not read contents of file %s\n", file)
-  }
-
-  f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-  if err != nil {
-    return fmt.Errorf("Could not open file %s for writing\n", file)
-  }
-
-  _, err = tpl.Parse(string(contents))
-  if err != nil {
-    return fmt.Errorf("Could not parse file %s contents\n", file)
-  }
-  err = tpl.Execute(f, vals)  
-  if err != nil {
-    return fmt.Errorf("Could not render file %s\n", file)
-  }
-
-  if err := f.Close(); err != nil {
-    return fmt.Errorf("Could close file %s after rendering\n", file)
-  }
-
-  return nil
-}
